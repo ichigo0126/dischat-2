@@ -13,25 +13,14 @@
       </div>
     </nav>
 
-    <transition-group name="chat" tag="div" class="list content">
-      <section v-for="item in chat" :key="item.id" class="item">
-        <div class="item-detail">
-          <div class="item-name">{{ item.name }}</div>
-          <div class="item-message">
-            <nl2br tag="div" :text="item.message" />
-          </div>
-        </div>
-      </section>
-    </transition-group>
-
     <main class="row">
       <div class="channels-container col-md-2">
         <h3>Channels</h3>
         <div class="channels">
           <b-tabs pills card vertical class="list">
-            <b-tab title="#Genenarl"></b-tab>
-            <b-tab title="#Weapons"></b-tab>
-            <b-tab title="#Combat"></b-tab>
+            <b-tab v-on:click="changeChannel('#General')" title="#General"></b-tab>
+            <b-tab v-on:click="changeChannel('#Weapons')" title="#Weapons"></b-tab>
+            <b-tab v-on:click="changeChannel('#Combat')" title="#Combat"></b-tab>
           </b-tabs>
         </div>
       </div>
@@ -39,48 +28,42 @@
       <div class="messages col-md-8">
         <h3>Messages</h3>
         <div class="chats">
-          <div class="chat">
+          <section v-for="talk in chat" :key="talk.id" class="chat">
             <div class="talk-history">
-              <p>John Wick</p>
+              <div class="talk-name">{{ talk.name }}</div>
               <div class="comment">
-                <p>Free free to talk about anything here</p>
+                <nl2br tag="div" :text="talk.message" />
               </div>
             </div>
             <div class="talk-addres">
               <p>@john</p>
               <div class="talk-time">
-                <p>11:49:32 pm 16-12-2018</p>
+                {{ formatDate(talk.created.toDate())}}
               </div>
             </div>
-          </div>
+          </section>
         </div>
         <div class="send">
           <div>
             <p class="m-0">@john</p>
-            <!-- <input
-              type="text"
-              class="form-control"
-              placeholder="Enter Message"
-            /> -->
+            <form action="" @submit.prevent="doSend" class="form">
+              <textarea
+                v-model="input"
+                :disabled="!user.uid"
+                @keydown.enter.exact.prevent="doSend"
+                type="text"
+                class="form-control"
+                placeholder="Enter Message"
+              ></textarea>
+              <button
+                type="submit"
+                :disabled="!user.uid"
+                class="btn btn-primary float-right mt-3"
+              >
+                Send
+              </button>
+            </form>
           </div>
-
-          <form action="" @submit.prevent="doSend" class="form">
-            <textarea
-              v-model="input"
-              :disabled="!user.uid"
-              @keydown.enter.exact.prevent="doSend"
-              type="text"
-              class="form-control"
-              placeholder="Enter Message"
-            ></textarea>
-            <button
-              type="submit"
-              :disabled="!user.uid"
-              class="btn btn-primary float-right mt-3"
-            >
-              Send
-            </button>
-          </form>
         </div>
       </div>
       <div class="members col-md-2">
@@ -100,11 +83,12 @@ import firebase from "firebase";
 import Nl2br from "vue-nl2br";
 export default {
   components: { Nl2br },
-  data() {
+  data() { //data関数は常に保持したいデータを変数に格納する場所
     return {
       user: {},
       chat: [],
       input: "",
+      channel: "#General"
     };
   },
 
@@ -112,7 +96,10 @@ export default {
     firebase.auth().onAuthStateChanged((user) => {
       this.user = user ? user : {};
       const db = firebase.firestore();
-      const collection = db.collection("messages");
+      const Generalcollection = db.collection("#General");
+      // const Weaponscollection = db.collection("#Weapons");
+      // const Combatcollection = db.collection("#Combat");
+
       if (user) {
         // onSnapshotは監視させるメソッド
         // snapshotはファイルかディレクトリの集合
@@ -120,18 +107,19 @@ export default {
         //collectionはフォルダでdocumentはファイル
         //onSnapshotはfirestoreのドキュメントを監視している
         //sendボタンを押したときに、documentにデータを追加したとき、onSnapshotで発火
-        collection.orderBy("created").onSnapshot((snapshot) => {
+        Generalcollection.orderBy("created").onSnapshot((snapshot) => {
           this.chat = [];
           snapshot.forEach((doc) => {
             this.chat.push(Object.assign({ id: doc.id }, doc.data()));
+            console.log(Object.assign({ id: doc.id }, doc.data()));
+            return;
           });
-          console.log(this.chat);
         });
       }
     });
   },
 
-  methods: {
+  methods: {//クリックしたときに実行したい処理を書くところ・関数を定義するところ
     doLogin() {
       const provider = new firebase.auth.GoogleAuthProvider();
       firebase.auth().signInWithPopup(provider);
@@ -143,7 +131,9 @@ export default {
 
     doSend() {
       const db = firebase.firestore();
-      const collection = db.collection("messages");
+      const collection = db.collection(this.channel);
+      
+
       if (this.input === "") {
         return;
       }
@@ -152,13 +142,45 @@ export default {
         .add({
           message: this.input,
           name: this.user.displayName,
-
-          created: firebase.firestore.FieldValue.serverTimestamp(),
-        })
+          created: new Date(),
+        }) 
         .then((doc) => {
           console.log(`${doc.id} added!`);
           this.input = "";
         });
+    },
+
+    formatDate(d) {
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const hour = d.getHours() < 10 ? "0" + d.getHours() : d.getHours();
+      const min = d.getMinutes() < 10 ? "0" + d.getMinutes() : d.getMinutes();
+      const sec = d.getSeconds() < 10 ? "0" + d.getSeconds() : d.getSeconds();
+      return (
+        year + "-" + month + "月" + day + "日" + hour + ":" +min + ":" + sec + ""
+      );
+    },
+    changeChannel(channel) {
+      this.channel=channel;
+      /*Channelsの切り替え
+      #Generalから#Weaponsや#Combatのボタンを押したときに
+      Messageの内容が変わる*/
+
+      /*Messageの内容を変えたい場合
+      firebaseのfirestoreからdataをとってくると同時に#Generalのチャットのdataを表示を消す*/
+    console.log(channel);
+    const db = firebase.firestore();
+    const collection = db.collection(channel);
+    collection.orderBy("created").onSnapshot((snapshot) => {
+          this.chat = [];
+          snapshot.forEach((doc) => {
+            this.chat.push(Object.assign({ id: doc.id }, doc.data()));
+            console.log(Object.assign({ id: doc.id }, doc.data()));
+            return;
+          });
+        });
+        
     },
   },
 };
@@ -186,11 +208,11 @@ h3 {
   padding-bottom: 10px;
 }
 .chats {
-  height: 75%;
+  height: 60%;
   overflow-y: scroll;
 }
 .send {
-  height: 5%;
+  height: 10%;
 }
 .send p {
   color: gray;
@@ -202,7 +224,7 @@ h3 {
 .chat {
   display: flex;
   justify-content: space-between;
-  border: 2px solid lightblue;
+  border: 1px solid gray;
   padding: 0 3px;
 }
 .talk-fistory {
@@ -222,6 +244,5 @@ h3 {
 }
 .form-control {
   resize: none;
-  
 }
 </style>
