@@ -169,7 +169,6 @@ export default {
 
       /*Messageの内容を変えたい場合
       firebaseのfirestoreからdataをとってくると同時に#Generalのチャットのdataを表示を消す*/
-    console.log(channel);
     const db = firebase.firestore();
     const collection = db.collection(channel);
     collection.orderBy("created").onSnapshot((snapshot) => {
