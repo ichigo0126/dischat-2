@@ -68,7 +68,7 @@
       </div>
       <div class="members col-md-2">
         <h3>Members</h3>
-        <b-tabs pills card vertical>
+        <b-tabs pills card vertical >
           <b-tab title="john Wick"></b-tab>
           <b-tab title="Ethan Hunt"></b-tab>
           <b-tab title="Evelyn Salt"></b-tab>
@@ -88,7 +88,7 @@ export default {
       user: {},
       chat: [],
       input: "",
-      channel: "#General"
+      channel: "#General",
     };
   },
 
@@ -96,7 +96,8 @@ export default {
     firebase.auth().onAuthStateChanged((user) => {
       this.user = user ? user : {};
       const db = firebase.firestore();
-      const Generalcollection = db.collection("#General");
+      const Generalcollection = db.collection("Channels").doc("#General").collection("chats");
+      console.log(user);
       // const Weaponscollection = db.collection("#Weapons");
       // const Combatcollection = db.collection("#Combat");
 
@@ -131,9 +132,7 @@ export default {
 
     doSend() {
       const db = firebase.firestore();
-      const collection = db.collection(this.channel);
-      
-
+      const collection = db.collection("Channels").doc(this.channel).collection("chats")
       if (this.input === "") {
         return;
       }
@@ -166,21 +165,28 @@ export default {
       /*Channelsの切り替え
       #Generalから#Weaponsや#Combatのボタンを押したときに
       Messageの内容が変わる*/
-
       /*Messageの内容を変えたい場合
       firebaseのfirestoreからdataをとってくると同時に#Generalのチャットのdataを表示を消す*/
     const db = firebase.firestore();
-    const collection = db.collection(channel);
+    const collection = db.collection("Channels").doc(this.channel).collection("chats");
+    const membersCollection = db.collection("Channels").doc(this.channel).collection("members");
+    membersCollection.add({
+        name: this.user.displayName,
+        uid:this.user.uid
+    })
     collection.orderBy("created").onSnapshot((snapshot) => {
           this.chat = [];
           snapshot.forEach((doc) => {
             this.chat.push(Object.assign({ id: doc.id }, doc.data()));
             console.log(Object.assign({ id: doc.id }, doc.data()));
+
+          
             return;
           });
         });
         
     },
+
   },
 };
 </script>
