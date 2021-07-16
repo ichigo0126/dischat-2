@@ -18,9 +18,9 @@
         <h3>Channels</h3>
         <div class="channels">
           <b-tabs pills card vertical class="list">
-            <b-tab v-on:click="changeChannel('#General')" title="#General"></b-tab>
-            <b-tab v-on:click="changeChannel('#Weapons')" title="#Weapons"></b-tab>
-            <b-tab v-on:click="changeChannel('#Combat')" title="#Combat"></b-tab>
+            <b-tab @click="changeChannel('#General')" title="#General"></b-tab>
+            <b-tab @click="changeChannel('#Weapons')" title="#Weapons"></b-tab>
+            <b-tab @click="changeChannel('#Combat')" title="#Combat"></b-tab>
           </b-tabs>
         </div>
       </div>
@@ -38,7 +38,7 @@
             <div class="talk-addres">
               <p>@john</p>
               <div class="talk-time">
-                {{ formatDate(talk.created.toDate())}}
+                {{ formatDate(talk.created.toDate()) }}
               </div>
             </div>
           </section>
@@ -68,10 +68,12 @@
       </div>
       <div class="members col-md-2">
         <h3>Members</h3>
-        <b-tabs pills card vertical >
-          <b-tab title="john Wick"></b-tab>
-          <b-tab title="Ethan Hunt"></b-tab>
-          <b-tab title="Evelyn Salt"></b-tab>
+        <b-tabs pills card vertical>
+          <b-tab
+            :title="member.name"
+            v-for="member in members"
+            :key="member.uid"
+          ></b-tab>
         </b-tabs>
       </div>
     </main>
@@ -83,12 +85,14 @@ import firebase from "firebase";
 import Nl2br from "vue-nl2br";
 export default {
   components: { Nl2br },
-  data() { //data関数は常に保持したいデータを変数に格納する場所
+  data() {
+    //data関数は常に保持したいデータを変数に格納する場所
     return {
       user: {},
       chat: [],
       input: "",
       channel: "#General",
+      members: [],
     };
   },
 
@@ -96,10 +100,10 @@ export default {
     firebase.auth().onAuthStateChanged((user) => {
       this.user = user ? user : {};
       const db = firebase.firestore();
-      const Generalcollection = db.collection("Channels").doc("#General").collection("chats");
-      console.log(user);
-      // const Weaponscollection = db.collection("#Weapons");
-      // const Combatcollection = db.collection("#Combat");
+      const Generalcollection = db
+        .collection("Channels")
+        .doc("#General")
+        .collection("chats");
 
       if (user) {
         // onSnapshotは監視させるメソッド
@@ -108,19 +112,29 @@ export default {
         //collectionはフォルダでdocumentはファイル
         //onSnapshotはfirestoreのドキュメントを監視している
         //sendボタンを押したときに、documentにデータを追加したとき、onSnapshotで発火
+        //orderByは並び替えをするメソッド
         Generalcollection.orderBy("created").onSnapshot((snapshot) => {
           this.chat = [];
           snapshot.forEach((doc) => {
-            this.chat.push(Object.assign({ id: doc.id }, doc.data()));
-            console.log(Object.assign({ id: doc.id }, doc.data()));
-            return;
+            this.chat.push(Object.assign({ id: doc.id }, doc.data())); //オブジェクトを結合する
+            if (
+              typeof this.members.find(
+                (userData) => userData.uid === doc.data().uid
+              ) === "undefined"
+            ) {
+              this.members.push({
+                uid: doc.data().uid,
+                name: doc.data().name,
+              });
+            }
           });
         });
       }
     });
   },
 
-  methods: {//クリックしたときに実行したい処理を書くところ・関数を定義するところ
+  methods: {
+    //クリックしたときに実行したい処理を書くところ・関数を定義するところ
     doLogin() {
       const provider = new firebase.auth.GoogleAuthProvider();
       firebase.auth().signInWithPopup(provider);
@@ -132,7 +146,10 @@ export default {
 
     doSend() {
       const db = firebase.firestore();
-      const collection = db.collection("Channels").doc(this.channel).collection("chats")
+      const collection = db
+        .collection("Channels")
+        .doc(this.channel)
+        .collection("chats");
       if (this.input === "") {
         return;
       }
@@ -142,7 +159,8 @@ export default {
           message: this.input,
           name: this.user.displayName,
           created: new Date(),
-        }) 
+          uid: this.user.uid,
+        })
         .then((doc) => {
           console.log(`${doc.id} added!`);
           this.input = "";
@@ -157,36 +175,50 @@ export default {
       const min = d.getMinutes() < 10 ? "0" + d.getMinutes() : d.getMinutes();
       const sec = d.getSeconds() < 10 ? "0" + d.getSeconds() : d.getSeconds();
       return (
-        year + "-" + month + "月" + day + "日" + hour + ":" +min + ":" + sec + ""
+        year +
+        "-" +
+        month +
+        "月" +
+        day +
+        "日" +
+        hour +
+        ":" +
+        min +
+        ":" +
+        sec +
+        ""
       );
     },
     changeChannel(channel) {
-      this.channel=channel;
+      this.channel = channel;
       /*Channelsの切り替え
       #Generalから#Weaponsや#Combatのボタンを押したときに
       Messageの内容が変わる*/
       /*Messageの内容を変えたい場合
       firebaseのfirestoreからdataをとってくると同時に#Generalのチャットのdataを表示を消す*/
-    const db = firebase.firestore();
-    const collection = db.collection("Channels").doc(this.channel).collection("chats");
-    const membersCollection = db.collection("Channels").doc(this.channel).collection("members");
-    membersCollection.add({
-        name: this.user.displayName,
-        uid:this.user.uid
-    })
-    collection.orderBy("created").onSnapshot((snapshot) => {
-          this.chat = [];
-          snapshot.forEach((doc) => {
-            this.chat.push(Object.assign({ id: doc.id }, doc.data()));
-            console.log(Object.assign({ id: doc.id }, doc.data()));
-
-          
-            return;
-          });
+      const db = firebase.firestore();
+      const collection = db
+        .collection("Channels")
+        .doc(this.channel)
+        .collection("chats");
+      collection.orderBy("created").onSnapshot((snapshot) => {
+        this.chat = [];
+        this.members = [];
+        snapshot.forEach((doc) => {
+          this.chat.push(Object.assign({ id: doc.id }, doc.data()));
+          if (
+            typeof this.members.find(
+              (userData) => userData.uid === doc.data().uid
+            ) === "undefined"
+          ) {
+            this.members.push({
+              uid: doc.data().uid,
+              name: doc.data().name,
+            });
+          }
         });
-        
+      });
     },
-
   },
 };
 </script>
